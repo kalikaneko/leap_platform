@@ -9,7 +9,8 @@ class LeapTest
     output.each_line.map{|line|
       pid = line.split(' ')[0]
       process = line.gsub(/(#{pid} |\n)/, '')
-      if process =~ /pgrep --full --list-name/
+      # filter out pgrep cmd itself
+      if process =~ /^sh/
         nil
       else
         {:pid => pid, :process => process}
