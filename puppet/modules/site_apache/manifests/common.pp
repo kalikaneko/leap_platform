@@ -6,20 +6,25 @@ class site_apache::common {
 
   class { '::apache': no_default_site => true, ssl => true }
 
-  # the ssl mod config depends on these modules to be installed
-  # on debian jessie
-  if ( versioncmp($::apache_version, '2.4') >= 0 ) {
-      apache::module {
-        'mime':;
-        'socache_shmcb':;
-      }
-  }
+  # needed for the mod_ssl config
+  apache::module { 'mime':; }
 
+  # load mods depending on apache version
   if ( versioncmp($::apache_version, '2.4') >= 0 ) {
-      apache::module { 'mpm_event':;
-      }
+    # apache >= 2.4, debian jessie
+    apache::module {
+      # needed for mod_ssl config
+      'socache_shmcb':;
+      # generally needed
+      'mpm_prefork':;
+    }
+  } else {
+    # apache < 2.4, debian wheezy
+    apache::module {
+      # for "Order" directive, i.e. main apache2.conf
+      'authz_host':;
+    }
   }
-
 
   include site_apache::common::tls
 }
