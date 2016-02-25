@@ -15,6 +15,9 @@ class site_config::remove::files {
   tidy {
     '/etc/default/leap_mx':;
     '/etc/logrotate.d/mx':;
+    '/etc/rsyslog.d/50-mx.conf':;
+    '/etc/apt/preferences.d/openvpn':;
+    '/etc/apt/sources.list.d/secondary.list.disabled.list':;
   }
 
   #
@@ -30,11 +33,8 @@ class site_config::remove::files {
     'leap_mx':
       path => '/var/log/',
       recurse => true,
-      matches => 'leap_mx*';
-    'mx':
-      path => '/var/log/leap/',
-      recurse => true,
-      matches => 'mx.log*';
+      matches => ['leap_mx*', 'mx.log.[1-5]', 'mx.log.[6-9](.gz)?',
+                  'mx.log.[0-9][0-9](.gz)?'];
     '/srv/leap/webapp/public/provider.json':;
     '/srv/leap/couchdb/designs/tmp_users':
       recurse => true,
@@ -51,22 +51,4 @@ class site_config::remove::files {
       onlyif  => "/bin/grep -qe 'leap_mx.log' /etc/check_mk/logwatch.state"
   }
 
-  # Don't use check_mk logwatch to watch bigcouch logs anymore
-  # see https://leap.se/code/issues/7375 for more details
-  file { '/etc/check_mk/logwatch.d/bigcouch.cfg':
-    ensure => absent,
-    notify => [
-      Exec['remove_bigcouch_logwatch_spoolfiles'],
-      Exec['remove_bigcouch_logwatch_stateline']
-    ]
-  }
-  # remove leftover bigcouch logwatch spool files
-  exec { 'remove_bigcouch_logwatch_spoolfiles':
-    command     => 'find /var/lib/check_mk/logwatch -name \'\\opt\\bigcouch\\var\\log\\bigcouch.log\' -exec rm {} \;',
-    refreshonly => true,
-  }
-  exec { 'remove_bigcouch_logwatch_stateline':
-    command     => "sed -i '/bigcouch.log/d' /etc/check_mk/logwatch.state",
-    refreshonly => true,
-  }
 }

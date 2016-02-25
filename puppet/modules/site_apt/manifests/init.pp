@@ -37,9 +37,10 @@ class site_apt {
 
   include ::site_apt::unattended_upgrades
 
-  apt::sources_list { 'secondary.list.disabled':
-    content => template('site_apt/secondary.list');
-  }
+  # not currently used
+  #apt::sources_list { 'secondary.list':
+  #  content => template('site_apt/secondary.list');
+  #}
 
   apt::preferences_snippet { 'facter':
     release  => "${::lsbdistcodename}-backports",
@@ -52,13 +53,8 @@ class site_apt {
     pin      => 'origin "deb.leap.se"'
   }
 
-  # All packages should be installed _after_ refresh_apt is called,
-  # which does an apt-get update.
-  # There is one exception:
-  # The creation of sources.list depends on the lsb package
+  # All packages should be installed after 'update_apt' is called,
+  # which does an 'apt-get update'.
+  Exec['update_apt'] -> Package <||>
 
-  File['/etc/apt/preferences'] ->
-    Apt::Preferences_snippet <| |> ->
-    Exec['refresh_apt'] ->
-    Package <| ( title != 'lsb' ) |>
 }

@@ -2,19 +2,10 @@
 class site_config::default {
   tag 'leap_base'
 
-  # the logoutput exec parameter defaults to "on_error" in puppet 3,
-  # but to "false" in puppet 2.7, so we need to set this globally here
-  Exec<||> { logoutput => on_failure }
-
   $services    = hiera('services', [])
   $domain_hash = hiera('domain')
   include site_config::params
-
-  # make sure apt is updated before any packages are installed
-  include apt::update
-  Package { require => Exec['apt_updated'] }
-
-  include site_config::slow
+  include site_config::setup
 
   # default class, used by all hosts
 
@@ -30,7 +21,10 @@ class site_config::default {
   # i.e. openstack/aws nodes, vagrant nodes
 
   # fix dhclient from changing resolver information
+  # facter returns 'true' as string
+  # lint:ignore:quoted_booleans
   if $::dhcp_enabled == 'true' {
+  # lint:endignore
     include site_config::dhclient
   }
 
@@ -47,7 +41,7 @@ class site_config::default {
   include haveged
 
   # install/remove base packages
-  include site_config::packages::base
+  include site_config::packages
 
   # include basic shorewall config
   include site_shorewall::defaults

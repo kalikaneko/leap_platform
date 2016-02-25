@@ -49,11 +49,10 @@ module LeapCli
         environments.each do |env|
           check_platform_pinning(env, global)
         end
+
         # compile hiera files for all the nodes in every environment that is
         # being deployed and only those environments.
         compile_hiera_files(manager.filter(environments), false)
-        # update server certificates if needed
-        update_certificates(nodes)
 
         ssh_connect(nodes, connect_options(options)) do |ssh|
           ssh.leap.log :checking, 'node' do
@@ -88,14 +87,21 @@ module LeapCli
     long_desc 'The FILTER can be the name of a node, service, or tag.'
     arg_name 'FILTER'
     command [:history, :h] do |c|
-      c.flag :port, :desc => 'Override the default SSH port.',
-                    :arg_name => 'PORT'
-      c.flag :ip,   :desc => 'Override the default SSH IP address.',
-                    :arg_name => 'IPADDRESS'
+      c.flag   :port, :desc => 'Override the default SSH port.',
+                      :arg_name => 'PORT'
+      c.flag   :ip,   :desc => 'Override the default SSH IP address.',
+                      :arg_name => 'IPADDRESS'
+      c.switch :last, :desc => 'Show last deploy only',
+                      :negatable => false
       c.action do |global,options,args|
+        if options[:last] == true
+          lines = 1
+        else
+          lines = 10
+        end
         nodes = manager.filter!(args)
         ssh_connect(nodes, connect_options(options)) do |ssh|
-          ssh.leap.history
+          ssh.leap.history(lines)
         end
       end
     end

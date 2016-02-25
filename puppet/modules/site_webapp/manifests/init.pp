@@ -21,11 +21,13 @@ class site_webapp {
   include site_webapp::couchdb
   include site_haproxy
   include site_webapp::cron
+  include site_config::default
   include site_config::x509::cert
   include site_config::x509::key
   include site_config::x509::ca
   include site_config::x509::client_ca::ca
   include site_config::x509::client_ca::key
+  include site_nickserver
 
   # remove leftovers from previous installations on webapp nodes
   include site_config::remove::webapp
@@ -58,7 +60,7 @@ class site_webapp {
 
   exec { 'bundler_update':
     cwd     => '/srv/leap/webapp',
-    command => '/bin/bash -c "/usr/bin/bundle check --path vendor/bundle || /usr/bin/bundle install --path vendor/bundle --without test development"',
+    command => '/bin/bash -c "/usr/bin/bundle check --path vendor/bundle || /usr/bin/bundle install --path vendor/bundle --without test development debug"',
     unless  => '/usr/bin/bundle check --path vendor/bundle',
     user    => 'leap-webapp',
     timeout => 600,

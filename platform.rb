@@ -15,6 +15,7 @@ Leap::Platform.define do
   #
   # absolute paths on the destination server
   #
+  self.hiera_dir  = '/etc/leap' if self.respond_to?(:hiera_dir)
   self.hiera_path = '/etc/leap/hiera.yaml'
   self.leap_dir   = '/srv/leap'
   self.files_dir  = '/srv/leap/files'
@@ -30,6 +31,7 @@ Leap::Platform.define do
     :files_dir        => 'files',
     :nodes_dir        => 'nodes',
     :services_dir     => 'services',
+    :templates_dir    => 'templates',
     :tags_dir         => 'tags',
     :node_files_dir   => 'files/nodes/#{arg}',
 
@@ -40,6 +42,7 @@ Leap::Platform.define do
     :node_config      => 'nodes/#{arg}.json',
     :service_config   => 'services/#{arg}.json',
     :tag_config       => 'tags/#{arg}.json',
+    :template_config  => 'templates/#{arg}.json',
 
     # input config files, environmentally scoped
     :provider_env_config  => 'provider.#{arg}.json',
@@ -75,6 +78,9 @@ Leap::Platform.define do
     :commercial_key   => 'files/cert/#{arg}.key',
     :commercial_csr   => 'files/cert/#{arg}.csr',
     :commercial_cert  => 'files/cert/#{arg}.crt',
+    :dkim_priv_key    => 'files/mx/dkim.key',
+    :dkim_pub_key     => 'files/mx/dkim.pub',
+
     :commercial_ca_cert       => 'files/cert/commercial_ca.crt',
     :vagrantfile              => 'test/Vagrantfile',
     :static_web_provider_json => 'files/web/bootstrap/#{arg}/provider.json',

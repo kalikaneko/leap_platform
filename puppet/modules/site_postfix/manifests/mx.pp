@@ -10,8 +10,9 @@ class site_postfix::mx {
   $mynetworks          = join(hiera('mynetworks', ''), ' ')
   $rbls                = suffix(prefix(hiera('rbls', []), 'reject_rbl_client '), ',')
 
-  $root_mail_recipient = hiera('contacts')
-  $postfix_smtp_listen = 'all'
+  $root_mail_recipient    = hiera('contacts')
+  $postfix_smtp_listen    = 'all'
+  $postfix_use_postscreen = 'yes'
 
   include site_config::x509::cert
   include site_config::x509::key
@@ -49,10 +50,9 @@ class site_postfix::mx {
       value => 'static:42424';
     'virtual_gid_maps':
       value => 'static:42424';
-    'smtpd_tls_received_header':
-      value => 'yes';
-    # the following is needed for matching user's client cert fingerprints to
-    # enable relaying (#3634)
+    # the two following configs are needed for matching user's client cert
+    # fingerprints to enable relaying (#3634). Satellites do not have
+    # these configured.
     'smtpd_tls_fingerprint_digest':
       value => 'sha1';
     'relay_clientcerts':
@@ -67,8 +67,12 @@ class site_postfix::mx {
     # alias map
     'local_recipient_maps':
       value => '$alias_maps';
+    # setup clamav and opendkim on smtpd
     'smtpd_milters':
-      value => 'unix:/run/clamav/milter.ctl,unix:/var/run/opendkim/opendkim.sock';
+      value => 'unix:/run/clamav/milter.ctl,inet:localhost:8891';
+    # setup opendkim for smtp (non-smtpd) outgoing mail
+    'non_smtpd_milters':
+      value => 'inet:localhost:8891';
     'milter_default_action':
       value => 'accept';
     # Make sure that the right values are set, these could be set to different
@@ -80,34 +84,54 @@ class site_postfix::mx {
       value => 'smtp';
     'mailbox_command':
       value => '';
+    'header_checks':
+      value => '';
+    'postscreen_access_list':
+      value => 'permit_mynetworks';
+    'postscreen_greet_action':
+      value => 'enforce';
   }
 
-  include site_postfix::mx::smtpd_checks
-  include site_postfix::mx::checks
-  include site_postfix::mx::smtp_tls
-  include site_postfix::mx::smtpd_tls
-  include site_postfix::mx::static_aliases
-  include site_postfix::mx::rewrite_openpgp_header
-  include clamav
-  include postfwd
+  include ::site_postfix::mx::smtpd_checks
+  include ::site_postfix::mx::checks
+  include ::site_postfix::mx::smtp_tls
+  include ::site_postfix::mx::smtpd_tls
+  include ::site_postfix::mx::static_aliases
+  include ::site_postfix::mx::rewrite_openpgp_header
+  include ::site_postfix::mx::received_anon
+  include ::clamav
+  include ::opendkim
+  include ::postfwd
 
   # greater verbosity for debugging, take out for production
   #include site_postfix::debug
+
+  case $::operatingsystemrelease {
+    /^7.*/: {
+      $smtpd_relay_restrictions=''
+    }
+    default:  {
+      $smtpd_relay_restrictions="  -o smtpd_relay_restrictions=\$smtps_relay_restrictions\n"
+    }
+  }
+
+  $mastercf_tail = "
+smtps     inet  n       -       -       -       -       smtpd
+  -o smtpd_tls_wrappermode=yes
+  -o smtpd_tls_security_level=encrypt
+${smtpd_relay_restrictions}  -o smtpd_recipient_restrictions=\$smtps_recipient_restrictions
+  -o smtpd_helo_restrictions=\$smtps_helo_restrictions
+  -o smtpd_client_restrictions=
+  -o cleanup_service_name=clean_smtps
+clean_smtps   unix  n - n - 0 cleanup
+  -o header_checks=pcre:/etc/postfix/checks/rewrite_openpgp_headers,pcre:/etc/postfix/checks/received_anon"
 
   class { 'postfix':
     preseed             => true,
     root_mail_recipient => $root_mail_recipient,
     smtp_listen         => 'all',
-    mastercf_tail       =>
-    "smtps     inet  n       -       -       -       -       smtpd
-  -o smtpd_tls_wrappermode=yes
-  -o smtpd_tls_security_level=encrypt
-  -o smtpd_recipient_restrictions=\$smtps_recipient_restrictions
-  -o smtpd_helo_restrictions=\$smtps_helo_restrictions
-  -o smtpd_client_restrictions=
-  -o cleanup_service_name=clean_smtps
-clean_smtps	  unix	n	-	n	-	0	cleanup
-  -o header_checks=pcre:/etc/postfix/checks/rewrite_openpgp_headers",
+    mastercf_tail       => $mastercf_tail,
+    use_postscreen      => 'yes',
     require             => [
       Class['Site_config::X509::Key'],
       Class['Site_config::X509::Cert'],

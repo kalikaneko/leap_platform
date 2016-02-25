@@ -40,9 +40,10 @@ class site_couchdb {
   $couchdb_mode             = $couchdb_config['mode']
   $couchdb_pwhash_alg       = $couchdb_config['pwhash_alg']
 
-  if $couchdb_mode == 'multimaster' { include site_couchdb::bigcouch }
-  if $couchdb_mode == 'master'      { include site_couchdb::master }
-  if $couchdb_mode == 'mirror'      { include site_couchdb::mirror }
+  if $couchdb_mode == 'multimaster'      { include site_couchdb::bigcouch }
+  if $couchdb_mode =~ /^(plain|master)$/ { include site_couchdb::plain }
+
+  # if $couchdb_mode == 'mirror'      { include site_couchdb::mirror }
 
   Class['site_config::default']
     -> Service['shorewall']
@@ -50,6 +51,7 @@ class site_couchdb {
     -> Class['couchdb']
     -> Class['site_couchdb::setup']
 
+  include ::site_config::default
   include site_stunnel
 
   include site_couchdb::setup
@@ -64,5 +66,14 @@ class site_couchdb {
 
   # remove tapicero leftovers on couchdb nodes
   include site_config::remove::tapicero
+
+  # Destroy every per-user storage database
+  # where the corresponding user record does not exist.
+  cron { 'cleanup_stale_userdbs':
+    command => '(/bin/date; /srv/leap/couchdb/scripts/cleanup-user-dbs) >> /var/log/leap/couchdb-cleanup.log',
+    user    => 'root',
+    hour    => 4,
+    minute  => 7;
+  }
 
 }

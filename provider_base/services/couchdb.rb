@@ -1,60 +1,38 @@
-#######################################################################
-###
-### NOTE!
-###
-###  Currently, mirrors do not work! The only thing that works is all
-###  nodes multimaster or a single master.
-###
-#######################################################################
 #
 # custom logic for couchdb json resolution
 # ============================================
 #
-# There are three modes for a node:
+# bigcouch is no longer maintained, so now the default behavior is
+# to always use plain couchdb, unless there are more than one couchdb
+# node or if "couch.mode" property is set to "multimaster".
 #
-# Multimaster
-# -----------
+# in the past, it used to work like this:
 #
-#    Multimaster uses bigcouch (soon to use couchdb in replication mode
-#    similar to bigcouch).
+# * if couch.master was set to true on one node, then do plain couchdb.
+# * if couch.master was not set anywhere, then do bigcouch.
+# * if couch.master was set on more than one node, then do bigcouch.
 #
-#    Use "multimaster" mode when:
-#
-#     * multiple nodes are marked couch.master
-#     * OR no nodes are marked couch.master
-#
-# Master
-# ------
-#
-#    Master uses plain couchdb that is readable and writable.
-#
-#    Use "master" mode when:
-#
-#     * Exactly one node, this one, is marked as master.
-#
-# Mirror
-# ------
-#
-#    Mirror creates a read-only copy of the database. It uses plain coucdhb
-#    with legacy couchdb replication (http based).
-#
-#    This does not currently work, because http replication can't handle
-#    the number of user databases.
-#
-#    Use "mirror" mode when:
-#
-#     * some nodes are marked couch.master
-#     * AND this node is not a master
+# Some of this legacy logic is still supported so that upgrading does
+# not unexpectedly turn bigcouch nodes into plain couchdb nodes.
 #
 
-master_count = nodes_like_me['services' => 'couchdb']['couch.master' => true].size
+if self.couch['master']
+  LeapCli::log :warning, "The node property 'couch.master' is deprecated.\n" +
+    "   In the future, you must set 'couch.mode' to either 'plain' or 'multimaster'.\n" +
+    "   (node '#{self.name}')"
+end
 
-if master_count == 0
+couchdb_nodes = nodes_like_me['services' => 'couchdb']
+
+if couchdb_nodes.size > 1
   apply_partial 'services/_couchdb_multimaster.json'
-elsif couch.master && master_count > 1
-  apply_partial 'services/_couchdb_multimaster.json'
-elsif couch.master && master_count == 1
-  apply_partial 'services/_couchdb_master.json'
+elsif self.couch.mode == "multimaster"
+  if self.couch['master']
+    # The old deprecated way of specifying plain couch is still being used
+    apply_partial 'services/_couchdb_plain.json'
+  else
+    apply_partial 'services/_couchdb_multimaster.json'
+  end
 else
-  apply_partial 'services/_couchdb_mirror.json'
+  apply_partial 'services/_couchdb_plain.json'
 end
